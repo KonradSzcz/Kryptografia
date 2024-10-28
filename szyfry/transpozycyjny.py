@@ -1,7 +1,7 @@
 import math
 
 # Dostosowywanie klucza
-def generate_key_sequence(key, length):
+def generate_key(key, length):
     key *= (length // len(key)) + 1
     return key[:length]
 
@@ -21,7 +21,7 @@ def is_coprime(a, b):
 
 def transposition_encrypt(plain_text, key):
     plain_text = plain_text.replace(" ", "")
-    key_sequence = generate_key_sequence(key, len(plain_text))
+    key_sequence = generate_key(key, len(plain_text))
     grid_size = len(key)
 
     # Tworzenie
@@ -50,7 +50,7 @@ def transposition_encrypt(plain_text, key):
     return ''.join(ciphertext)
 
 def transposition_decrypt(cipher_text, key):
-    key_sequence = generate_key_sequence(key, len(cipher_text))
+    key_sequence = generate_key(key, len(cipher_text))
     grid_size = len(key)
 
     # Tworzenie
