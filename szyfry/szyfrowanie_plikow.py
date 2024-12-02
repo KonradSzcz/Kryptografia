@@ -1,7 +1,8 @@
 import base64
 from Crypto.Cipher import AES, DES
 from Crypto.Util.Padding import pad, unpad
-import os
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
 # Dostosowywanie klucza
 def generate_key(key, length):
@@ -57,3 +58,40 @@ def decrypt_file_with_aes(encrypted_data, key):
         return unpad(decrypted_padded_data, AES.block_size).decode('utf-8')
     except (ValueError, KeyError):
         return "Błędny klucz."
+
+# Funkcja szyfrowania pliku za pomocą RSA (dzielenie pliku na bloki)
+def encrypt_file_with_rsa(data, public_key):
+    try:
+        cipher = PKCS1_OAEP.new(public_key)
+        encrypted_data = bytearray()
+
+        # Dzielimy dane na mniejsze bloki, które mogą być zaszyfrowane przez RSA
+        block_size = public_key.size_in_bytes() - 42  # 42 to rozmiar paddingu w PKCS1_OAEP
+        for i in range(0, len(data), block_size):
+            block = data[i:i + block_size]
+            encrypted_block = cipher.encrypt(block)
+            encrypted_data.extend(encrypted_block)
+
+        return bytes(encrypted_data)
+
+    except Exception as e:
+        raise ValueError(f"Błąd podczas szyfrowania pliku: {e}")
+# Funkcja deszyfrowania pliku za pomocą RSA (dzielenie pliku na bloki)
+def decrypt_file_with_rsa(data, private_key):
+    try:
+        cipher = PKCS1_OAEP.new(private_key)
+        decrypted_data = bytearray()
+
+        block_size = private_key.size_in_bytes()  # Maksymalny rozmiar bloku
+        for i in range(0, len(data), block_size):
+            block = data[i:i + block_size]
+            decrypted_block = cipher.decrypt(block)
+            decrypted_data.extend(decrypted_block)
+
+        return bytes(decrypted_data)
+
+    except Exception as e:
+        raise ValueError(f"Błąd podczas odszyfrowywania pliku: {e}")
+
+
+
