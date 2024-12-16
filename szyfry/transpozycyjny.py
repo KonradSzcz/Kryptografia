@@ -19,63 +19,82 @@ def mod_inverse(a, mod):
 def is_coprime(a, b):
     return math.gcd(a, b) == 1
 
+# Funkcja tworzenia spirali
+def create_spiral(size):
+    spiral = [[0] * size for _ in range(size)]
+    left, right, top, bottom = 0, size - 1, 0, size - 1
+    num = 1
+
+    while left <= right and top <= bottom:
+        for i in range(left, right + 1):
+            spiral[top][i] = num
+            num += 1
+        top += 1
+
+        for i in range(top, bottom + 1):
+            spiral[i][right] = num
+            num += 1
+        right -= 1
+
+        for i in range(right, left - 1, -1):
+            spiral[bottom][i] = num
+            num += 1
+        bottom -= 1
+
+        for i in range(bottom, top - 1, -1):
+            spiral[i][left] = num
+            num += 1
+        left += 1
+
+    return spiral
+
 def transposition_encrypt(plain_text, key):
     plain_text = plain_text.replace(" ", "")
     key_sequence = generate_key(key, len(plain_text))
     grid_size = len(key)
 
-    # Tworzenie
-    grid = [['' for _ in range(grid_size)] for _ in range((len(plain_text) + grid_size - 1) // grid_size)]
-    index = 0
+    # Tworzenie spirali
+    spiral = create_spiral(grid_size)
+    cipher_grid = [[None for _ in range(grid_size)] for _ in range(grid_size)]
 
-    # Wypełnianie
-    for row in range(len(grid)):
-        for col in range(grid_size):
-            if index < len(plain_text):
-                factor = (row + 1) * (col + 1)
+    index = 0
+    for i in range(grid_size):
+        for j in range(grid_size):
+            if spiral[i][j] is not None and index < len(plain_text):
+                factor = spiral[i][j]
                 if is_coprime(factor, 256):
-                    grid[row][col] = transform_char(plain_text[index], factor)
+                    cipher_grid[i][j] = transform_char(plain_text[index], factor)
                 else:
-                    grid[row][col] = plain_text[index]
+                    cipher_grid[i][j] = plain_text[index]
                 index += 1
 
-    # Szyfr
-    ciphertext = []
-    for diag in range(len(grid) + len(grid[0]) - 1):
-        for row in range(len(grid)):
-            col = diag - row
-            if 0 <= col < len(grid[0]) and grid[row][col]:
-                ciphertext.append(grid[row][col])
-
-    return ''.join(ciphertext)
+    ciphertext = ''.join(''.join(cell for cell in row if cell is not None) for row in cipher_grid)
+    return ciphertext
 
 def transposition_decrypt(cipher_text, key):
     key_sequence = generate_key(key, len(cipher_text))
     grid_size = len(key)
 
-    # Tworzenie
-    grid_height = (len(cipher_text) + grid_size - 1) // grid_size
-    grid = [['' for _ in range(grid_size)] for _ in range(grid_height)]
+    # Tworzenie spirali
+    spiral = create_spiral(grid_size)
+    cipher_grid = [[None for _ in range(grid_size)] for _ in range(grid_size)]
 
-    # Wypełnianie
     index = 0
-    for diag in range(len(grid) + len(grid[0]) - 1):
-        for row in range(len(grid)):
-            col = diag - row
-            if 0 <= col < len(grid[0]) and index < len(cipher_text):
-                grid[row][col] = cipher_text[index]
+    for i in range(grid_size):
+        for j in range(grid_size):
+            if spiral[i][j] is not None and index < len(cipher_text):
+                cipher_grid[i][j] = cipher_text[index]
                 index += 1
 
-    # Jawny tekst
     plaintext = []
-    for row in range(len(grid)):
-        for col in range(len(grid[0])):
-            if grid[row][col]:
-                factor = (row + 1) * (col + 1)
+    for i in range(grid_size):
+        for j in range(grid_size):
+            if cipher_grid[i][j] is not None:
+                factor = spiral[i][j]
                 if is_coprime(factor, 256):
-                    original_char = transform_char(grid[row][col], -factor)
+                    original_char = transform_char(cipher_grid[i][j], -factor)
                 else:
-                    original_char = grid[row][col]
+                    original_char = cipher_grid[i][j]
                 plaintext.append(original_char)
 
     return ''.join(plaintext)

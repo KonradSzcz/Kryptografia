@@ -23,9 +23,13 @@ from szyfry.szyfrowanie_plikow import encrypt_file_with_aes, decrypt_file_with_a
 from szyfry.rsa import RSAEncryption
 from szyfry.audio import encrypt_audio_data, decrypt_audio_data
 from szyfry.certyficate import load_certificate, display_certificate_nodes
+from szyfry.hmac import generate_hmac, verify_hmac
+from szyfry.hamming import encode_hamming, detect_and_correct_error
+from szyfry.huffman import HuffmanCoding
 
 # Utworzenie obiektu klasy RSAEncryption
 rsa_encryption = RSAEncryption()
+huffman_coder = HuffmanCoding()
 
 
 # Polialfabetycznyn
@@ -340,32 +344,42 @@ def diffi():
         p, q = map(int, plain_text.get("1.0", tk.END).strip().split())
         a_private, b_private = map(int, key_entry.get().strip().split())
 
-        print(f"Modulus (p): {p}")
-        print(f"Podstawa (q): {q}")
-        print(f"Prywatny klucz A: {a_private}")
-        print(f"Prywatny klucz B: {b_private}")
+        results = []
+
+        results.append(f"Modulus (p): {p}")
+        results.append(f"Podstawa (q): {q}")
+        results.append(f"Prywatny klucz A: {a_private}")
+        results.append(f"Prywatny klucz B: {b_private}")
 
         A_public = pow(q, a_private, p)
         B_public = pow(q, b_private, p)
 
-        print(f"Publiczny klucz A (q^a mod p): {A_public}")
-        print(f"Publiczny klucz B (q^b mod p): {B_public}")
+        results.append(f"Publiczny klucz A (q^a mod p): {A_public}")
+        results.append(f"Publiczny klucz B (q^b mod p): {B_public}")
 
         A_shared_secret = pow(B_public, a_private, p)
         B_shared_secret = pow(A_public, b_private, p)
 
-        print(f"Wspólny klucz obliczany przez A (B^a mod p): {A_shared_secret}")
-        print(f"Wspólny klucz obliczany przez B (A^b mod p): {B_shared_secret}")
+        results.append(f"Wspólny klucz obliczany przez A (B^a mod p): {A_shared_secret}")
+        results.append(f"Wspólny klucz obliczany przez B (A^b mod p): {B_shared_secret}")
 
         if A_shared_secret == B_shared_secret:
-            result = f"\nWspólny klucz: {A_shared_secret}"
+            results.append(f"Wspólny klucz: {A_shared_secret}")
         else:
-            result = "\nBłąd: Klucze publiczne się nie zgadzają!"
+            results.append("Błąd: Klucze publiczne się nie zgadzają!")
 
-        cipher_text_output.config(text=result)
+        # Stworzenie nowego okna dla wyników
+        result_window = tk.Toplevel()
+        result_window.title("Wyniki Diffie-Hellman")
+
+        result_text = tk.Text(result_window, wrap=tk.WORD)
+        result_text.pack(pady=20, padx=20)
+
+        for res in results:
+            result_text.insert(tk.END, res + "\n")
 
     except ValueError:
-        messagebox.showerror("Błąd", "Proszę wprowadzić poprawne liczby w odpowiednich polach!")
+        messagebox.showerror("Błąd", "Proszę wprowadzić dwie liczby w polu wiadomości oraz dwie liczby w polu klucza, oddzielone spacjami.")
 
 
 # Funkcja nagrywania dźwięku
@@ -506,7 +520,95 @@ def verify_signature_handler():
     # Wyświetlenie wyniku w GUI
     cipher_text_output.config(text=result)
 
+# HMAC
+def generate_hmac_handler():
+    data = plain_text.get("1.0", tk.END).strip().encode()
+    key = key_entry.get().strip().encode()
 
+    if data and key:
+        hmac_value = generate_hmac(data, key)
+        cipher_text_output.config(text=f"{hmac_value}")
+    else:
+        cipher_text_output.config(text="Podaj dane i klucz do generowania HMAC!")
+
+def verify_hmac_handler():
+    data = plain_text.get("1.0", tk.END).strip().encode()
+    key = key_entry.get().strip().encode()
+    hmac_value = hmac_entry.get().strip()
+
+    if data and key and hmac_value:
+        is_valid = verify_hmac(data, key, hmac_value)
+        if is_valid:
+            cipher_text_output.config(text="HMAC poprawny!")
+        else:
+            cipher_text_output.config(text="HMAC niepoprawny!")
+    else:
+        cipher_text_output.config(text="Podaj dane, klucz i HMAC do weryfikacji!")
+
+def switch_hmac():
+    cipher_text_value = cipher_text_output.cget("text")
+    hmac_entry.delete(0, tk.END)  # Wyczyść pole hmac_entry
+    hmac_entry.insert(0, cipher_text_value)  # Wstaw wynik do hmac_entry
+
+
+
+# Hamming
+def encrypt_with_hamming():
+    plain_text_value = plain_text.get("1.0", tk.END).strip()
+
+    if plain_text_value:
+        try:
+            binary_data = ''.join(format(ord(char), '08b') for char in plain_text_value)
+            encoded_result = encode_hamming(binary_data)
+            cipher_text_output.config(text=encoded_result)
+        except Exception as e:
+            cipher_text_output.config(text=f"Błąd kodowania: {e}")
+    else:
+        cipher_text_output.config(text="Podaj tekst jawny!")
+
+
+def decrypt_with_hamming():
+    cipher_text_value = plain_text.get("1.0", tk.END).strip()
+
+    if cipher_text_value:
+        try:
+            received_data = list(map(int, cipher_text_value))
+            corrected_binary = detect_and_correct_error(received_data)
+            corrected_text = ''.join(
+                chr(int(corrected_binary[i:i + 8], 2)) for i in range(0, len(corrected_binary), 8)
+            )
+            cipher_text_output.config(text=corrected_text)
+        except Exception as e:
+            cipher_text_output.config(text=f"Błąd dekodowania: {e}")
+    else:
+        cipher_text_output.config(text="Podaj zaszyfrowany tekst!")
+
+
+# Huffman
+def encrypt_with_huffman():
+    plain_text_value = plain_text.get("1.0", tk.END).strip()
+
+    if plain_text_value:
+        try:
+            encoded_result = huffman_coder.encode(plain_text_value)
+            cipher_text_output.config(text=encoded_result)
+        except Exception as e:
+            cipher_text_output.config(text=f"Błąd kodowania: {e}")
+    else:
+        cipher_text_output.config(text="Podaj tekst jawny!")
+
+
+def decrypt_with_huffman():
+    cipher_text_value = plain_text.get("1.0", tk.END).strip()
+
+    if cipher_text_value:
+        try:
+            decoded_result = huffman_coder.decode(cipher_text_value)
+            cipher_text_output.config(text=decoded_result)
+        except Exception as e:
+            cipher_text_output.config(text=f"Błąd dekodowania: {e}")
+    else:
+        cipher_text_output.config(text="Podaj zaszyfrowany tekst!")
 
 
 # Dane z pliku
@@ -630,6 +732,13 @@ key_label.pack(anchor="w", padx=10)
 key_entry = ttk.Entry(data_entry_frame)
 key_entry.pack(padx=10, pady=5, fill="x")
 
+hmac_label = tk.Label(data_entry_frame, text="HMAC", bg="#56f2e1")
+hmac_label.pack(anchor="w", padx=10)
+
+hmac_entry = ttk.Entry(data_entry_frame)
+hmac_entry.pack(padx=10, pady=5, fill="x")
+
+
 rsa_public_frame = tk.LabelFrame(center_frame, text="Klucz RSA publiczny", font=("Arial", 12), bg="#56f2e1")
 rsa_public_frame.pack(pady=10, padx=10, fill="both", expand=False)
 
@@ -658,29 +767,73 @@ operations_frame.pack(pady=20, padx=10, fill="x")
 file_button = ttk.Button(operations_frame, command=load_file, text="Wczytaj tekst")
 file_button.pack(pady=10, padx=10, fill="x")
 
-file_encrypt_label = tk.Label(operations_frame, text="Szyfrowanie", font=("Arial", 12, "bold"), bg="#0abdb1")
-file_encrypt_label.pack(anchor="center", pady=10)
+file_encrypt_frame = tk.LabelFrame(right_frame, text="Szyfrowanie", font=("Arial", 14, "bold"),
+                              bg="#0abdb1")
+file_encrypt_frame.pack(pady=20,padx=10, fill="x")
 
-file_encrypt_aes_button = ttk.Button(operations_frame, text="Szyfruj plik AES", command=encrypt_aes_handler)
+
+file_encrypt_aes_button = ttk.Button(file_encrypt_frame, text="Szyfruj plik AES", command=encrypt_aes_handler)
 file_encrypt_aes_button.pack(pady=5, padx=10, fill="x")
 
-file_encrypt_des_button = ttk.Button(operations_frame, text="Szyfruj plik DES", command=encrypt_des_handler)
+file_encrypt_des_button = ttk.Button(file_encrypt_frame, text="Szyfruj plik DES", command=encrypt_des_handler)
 file_encrypt_des_button.pack(pady=5, padx=10, fill="x")
 
-file_encrypt_rsa_button = ttk.Button(operations_frame, text="Szyfruj plik RSA", command=encrypt_rsa_handler)
+file_encrypt_rsa_button = ttk.Button(file_encrypt_frame, text="Szyfruj plik RSA", command=encrypt_rsa_handler)
 file_encrypt_rsa_button.pack(pady=5, padx=10, fill="x")
 
-file_decrypt_label = tk.Label(operations_frame, text="Odszyfrowywanie", font=("Arial", 12, "bold"), bg="#0abdb1")
-file_decrypt_label.pack(anchor="center", pady=10)
 
-file_decrypt_aes_button = ttk.Button(operations_frame, text="Odszyfruj plik AES", command=decrypt_aes_handler)
+
+file_decrypt_frame = tk.LabelFrame(right_frame, text="Odszyfrowanie", font=("Arial", 14, "bold"),
+                              bg="#0abdb1")
+file_decrypt_frame.pack(pady=20,padx=10, fill="x")
+
+file_decrypt_aes_button = ttk.Button(file_decrypt_frame, text="Odszyfruj plik AES", command=decrypt_aes_handler)
 file_decrypt_aes_button.pack(pady=5, padx=10, fill="x")
 
-file_decrypt_des_button = ttk.Button(operations_frame, text="Odszyfruj plik DES", command=decrypt_des_handler)
+file_decrypt_des_button = ttk.Button(file_decrypt_frame, text="Odszyfruj plik DES", command=decrypt_des_handler)
 file_decrypt_des_button.pack(pady=5, padx=10, fill="x")
 
-file_decrypt_rsa_button = ttk.Button(operations_frame, text="Odszyfruj plik RSA", command=decrypt_rsa_handler)
+file_decrypt_rsa_button = ttk.Button(file_decrypt_frame, text="Odszyfruj plik RSA", command=decrypt_rsa_handler)
 file_decrypt_rsa_button.pack(pady=5, padx=10, fill="x")
+
+
+
+hmac_frame = tk.LabelFrame(right_frame, text="HMAC", font=("Arial", 14, "bold"),
+                              bg="#0abdb1")
+hmac_frame.pack(pady=20,padx=10, fill="x")
+
+generate_hmac_button = ttk.Button(hmac_frame, command=generate_hmac_handler, text="Generuj HMAC")
+generate_hmac_button.pack(padx=5, pady=10, fill="x")
+
+verify_hmac_button = ttk.Button(hmac_frame, command=verify_hmac_handler, text="Sprawdź HMAC")
+verify_hmac_button.pack(padx=5, pady=10, fill="x")
+
+switch_hmac_button = ttk.Button(hmac_frame, command=switch_hmac, text="Skopiuj HMAC")
+switch_hmac_button.pack(padx=5, pady=10, fill="x")
+
+
+
+hamming_frame = tk.LabelFrame(right_frame, text="Hamming", font=("Arial", 14, "bold"),
+                              bg="#0abdb1")
+hamming_frame.pack(pady=20,padx=10, fill="x")
+
+encrypt_hamming_button = ttk.Button(hamming_frame, command=encrypt_with_hamming, text="Szyfrowanie kod Hamminga")
+encrypt_hamming_button.pack(padx=5, pady=10, fill="x")
+
+decrypt_hamming_button = ttk.Button(hamming_frame, command=decrypt_with_hamming, text="Deszyfrowanie kod Hamminga")
+decrypt_hamming_button.pack(padx=5, pady=10, fill="x")
+
+
+
+huffman_frame = tk.LabelFrame(right_frame, text="Huffman", font=("Arial", 14, "bold"),
+                              bg="#0abdb1")
+huffman_frame.pack(pady=20,padx=10, fill="x")
+
+encrypt_huffman_button = ttk.Button(huffman_frame, command=encrypt_with_huffman, text="Szyfrowanie kod Huffmana")
+encrypt_huffman_button.pack(padx=5, pady=10, fill="x")
+
+decrypt_huffman_button = ttk.Button(huffman_frame, command=decrypt_with_huffman, text="Deszyfrowanie kod Huffmana")
+decrypt_huffman_button.pack(padx=5, pady=10, fill="x")
 
 # Główna pętla aplikacji
 root.mainloop()
