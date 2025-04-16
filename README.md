@@ -1,2 +1,2 @@
 # Kryptografia
-Aplikacja wykorzystująca różne sposoby szyfrowania 
+Aplikacja wykorzystująca różne sposoby szyfrowania robiona na zaliczenie przedmiotu
