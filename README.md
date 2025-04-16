@@ -1,2 +1,2 @@
 # Kryptografia
-kryptografia
+Aplikacja wykorzystująca różne sposoby szyfrowania 
